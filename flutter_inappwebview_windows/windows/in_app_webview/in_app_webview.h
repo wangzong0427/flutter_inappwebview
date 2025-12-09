@@ -116,6 +116,8 @@ namespace flutter_inappwebview_plugin
     static void createInAppWebViewEnv(const HWND parentWindow, const bool& willBeSurface, WebViewEnvironment* webViewEnvironment, const std::shared_ptr<InAppWebViewSettings> initialSettings, std::function<void(wil::com_ptr<ICoreWebView2Environment> webViewEnv,
       wil::com_ptr<ICoreWebView2Controller> webViewController,
       wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController)> completionHandler);
+    
+    void recreateWebView();
 
     // custom_platform_view
     ABI::Windows::UI::Composition::IVisual* const surface()

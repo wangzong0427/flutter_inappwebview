@@ -191,6 +191,74 @@ namespace flutter_inappwebview_plugin
       std::make_unique<WebViewChannelDelegate>(this, plugin->registrar->messenger());
   }
 
+  void InAppWebView::recreateWebView()
+  {
+      HWND parentWindow = nullptr;
+
+      // 获取旧窗口
+      if (webViewController) {
+          if (FAILED(webViewController->get_ParentWindow(&parentWindow)) || parentWindow == nullptr) {
+              // 如果窗口已失效，重新创建一个新的窗口
+              parentWindow = CreateWindowEx(
+                  0, L"STATIC", L"",
+                  WS_CHILD | WS_VISIBLE,
+                  0, 0, 100, 100,
+                  plugin->registrar->GetView()->GetNativeWindow(),
+                  nullptr, nullptr, nullptr
+              );
+          }
+      }
+
+      // 关闭旧对象
+      if (webViewController) {
+          webViewController->Close();
+      }
+
+      webView = nullptr;
+      webViewController = nullptr;
+      webViewCompositionController = nullptr;
+
+      // 重新创建 WebView2
+      InAppWebView::createInAppWebViewEnv(
+          parentWindow,
+          true,
+          nullptr,
+          settings,
+          [this](wil::com_ptr<ICoreWebView2Environment> env,
+                wil::com_ptr<ICoreWebView2Controller> controller,
+                wil::com_ptr<ICoreWebView2CompositionController> composition)
+          {
+              if (!env || !controller) {
+                  debugLog("recreateWebView failed: invalid env/controller");
+                  return;
+              }
+
+              this->webViewEnv = env;
+              this->webViewController = controller;
+              this->webViewCompositionController = composition;
+
+              controller->get_CoreWebView2(this->webView.put());
+
+              // 重新绑定 Dart <-> Native 通道
+              this->initChannel(this->id, std::nullopt);
+
+              // 重建设置 & 事件
+              InAppWebViewCreationParams params{
+                  this->id,
+                  this->settings,
+                  std::nullopt
+              };
+              this->prepare(params);
+
+              // 发送重建完成回调给 Flutter
+              if (channelDelegate) {
+                  channelDelegate->onLoadStart(std::nullopt);
+              }
+          }
+      );
+  }
+
+
   void InAppWebView::prepare(const InAppWebViewCreationParams& params)
   {
     if (!webView) {
